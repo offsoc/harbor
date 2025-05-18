@@ -47,13 +47,13 @@
     "js-yaml": "^4.1.0",
     "ngx-clipboard": "^15.1.0",
     "ngx-cookie": "^6.0.1",
-    "ngx-markdown": "16.0.0",
+    "ngx-markdown": "19.1.1",
     "rxjs": "^7.4.0",
     "tslib": "^2.7.0",
     "zone.js": "^0.13.3"
   },
   "devDependencies": {
-    "@angular-devkit/build-angular": "^16.2.16",
+    "@angular-devkit/build-angular": "^19.2.11",
     "@angular-eslint/builder": "16.1.2",
     "@angular-eslint/eslint-plugin": "16.1.2",
     "@angular-eslint/eslint-plugin-template": "16.1.2",
