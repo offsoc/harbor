@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/orm"
 	allowlist "github.com/goharbor/harbor/src/pkg/allowlist/models"
 )
@@ -156,8 +157,35 @@ func (p *Project) AutoSBOMGen() bool {
 	return isTrue(auto)
 }
 
+// ProxyCacheSpeed ...
+func (p *Project) ProxyCacheSpeed() int32 {
+	speed, exist := p.GetMetadata(ProMetaProxySpeed)
+	if !exist {
+		return 0
+	}
+	speedInt, err := strconv.ParseInt(speed, 10, 32)
+	if err != nil {
+		return 0
+	}
+	return int32(speedInt)
+}
+
+// MaxUpstreamConnection ...
+func (p *Project) MaxUpstreamConnection() int {
+	countVal, exist := p.GetMetadata(ProMetaMaxUpstreamConn)
+	if !exist {
+		return 0
+	}
+	cnt, err := strconv.ParseInt(countVal, 10, 32)
+	if err != nil {
+		log.Warningf("failed th parse the max_upstream_conn, val:%s error %v", countVal, err)
+		return 0
+	}
+	return int(cnt)
+}
+
 // FilterByPublic returns orm.QuerySeter with public filter
-func (p *Project) FilterByPublic(_ context.Context, qs orm.QuerySeter, _ string, value interface{}) orm.QuerySeter {
+func (p *Project) FilterByPublic(_ context.Context, qs orm.QuerySeter, _ string, value any) orm.QuerySeter {
 	subQuery := `SELECT project_id FROM project_metadata WHERE name = 'public' AND value = '%s'`
 	if isTrue(value) {
 		subQuery = fmt.Sprintf(subQuery, "true")
@@ -168,7 +196,7 @@ func (p *Project) FilterByPublic(_ context.Context, qs orm.QuerySeter, _ string,
 }
 
 // FilterByOwner returns orm.QuerySeter with owner filter
-func (p *Project) FilterByOwner(_ context.Context, qs orm.QuerySeter, _ string, value interface{}) orm.QuerySeter {
+func (p *Project) FilterByOwner(_ context.Context, qs orm.QuerySeter, _ string, value any) orm.QuerySeter {
 	username, ok := value.(string)
 	if !ok {
 		return qs
@@ -178,7 +206,7 @@ func (p *Project) FilterByOwner(_ context.Context, qs orm.QuerySeter, _ string, 
 }
 
 // FilterByMember returns orm.QuerySeter with member filter
-func (p *Project) FilterByMember(_ context.Context, qs orm.QuerySeter, _ string, value interface{}) orm.QuerySeter {
+func (p *Project) FilterByMember(_ context.Context, qs orm.QuerySeter, _ string, value any) orm.QuerySeter {
 	query, ok := value.(*MemberQuery)
 	if !ok {
 		return qs
@@ -206,7 +234,7 @@ func (p *Project) FilterByMember(_ context.Context, qs orm.QuerySeter, _ string,
 }
 
 // FilterByNames returns orm.QuerySeter with name filter
-func (p *Project) FilterByNames(_ context.Context, qs orm.QuerySeter, _ string, value interface{}) orm.QuerySeter {
+func (p *Project) FilterByNames(_ context.Context, qs orm.QuerySeter, _ string, value any) orm.QuerySeter {
 	query, ok := value.(*NamesQuery)
 	if !ok {
 		return qs
@@ -229,7 +257,7 @@ func (p *Project) FilterByNames(_ context.Context, qs orm.QuerySeter, _ string, 
 	return qs.FilterRaw("project_id", fmt.Sprintf("IN (%s)", subQuery))
 }
 
-func isTrue(i interface{}) bool {
+func isTrue(i any) bool {
 	switch value := i.(type) {
 	case bool:
 		return value

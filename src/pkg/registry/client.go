@@ -132,17 +132,29 @@ type Client interface {
 // do the auth work. If a customized authorizer is needed, use "NewClientWithAuthorizer" instead
 func NewClient(url, username, password string, insecure bool, interceptors ...interceptor.Interceptor) Client {
 	authorizer := auth.NewAuthorizer(username, password, insecure)
-	return NewClientWithAuthorizer(url, authorizer, insecure, interceptors...)
+	return NewClientWithAuthorizer(url, authorizer, insecure, "", interceptors...)
+}
+
+// NewClientWithCACert creates a registry client with custom CA certificate
+func NewClientWithCACert(url, username, password string, insecure bool, caCert string, interceptors ...interceptor.Interceptor) Client {
+	authorizer := auth.NewAuthorizer(username, password, insecure, caCert)
+	return NewClientWithAuthorizer(url, authorizer, insecure, caCert, interceptors...)
 }
 
 // NewClientWithAuthorizer creates a registry client with the provided authorizer
-func NewClientWithAuthorizer(url string, authorizer lib.Authorizer, insecure bool, interceptors ...interceptor.Interceptor) Client {
+func NewClientWithAuthorizer(url string, authorizer lib.Authorizer, insecure bool, caCert string, interceptors ...interceptor.Interceptor) Client {
+	// When CACertificate is set, it takes precedence and Insecure is ignored
+	transport := commonhttp.GetHTTPTransport(
+		commonhttp.WithInsecure(insecure),
+		commonhttp.WithCACert(caCert),
+	)
+
 	return &client{
 		url:          url,
 		authorizer:   authorizer,
 		interceptors: interceptors,
 		client: &http.Client{
-			Transport: commonhttp.GetHTTPTransport(commonhttp.WithInsecure(insecure)),
+			Transport: transport,
 			Timeout:   registryHTTPClientTimeout,
 		},
 	}
@@ -340,7 +352,7 @@ func (c *client) DeleteManifest(repository, reference string) error {
 		}
 		if !exist {
 			return errors.New(nil).WithCode(errors.NotFoundCode).
-				WithMessage("%s:%s not found", repository, reference)
+				WithMessagef("%s:%s not found", repository, reference)
 		}
 		reference = string(desc.Digest)
 	}
@@ -467,7 +479,7 @@ func (c *client) PushBlobChunk(repository, digest string, blobSize int64, chunk 
 	resp, err := c.do(req)
 	if err != nil {
 		// if push chunk error, we should query the upload progress for new location and end range.
-		newLocation, newEnd, err1 := c.getUploadStatus(location)
+		newLocation, newEnd, err1 := c.getUploadStatus(url)
 		if err1 == nil {
 			return newLocation, newEnd, err
 		}
@@ -669,7 +681,6 @@ func (c *client) do(req *http.Request) (*http.Response, error) {
 		if err != nil {
 			return nil, err
 		}
-		message := fmt.Sprintf("http status code: %d, body: %s", resp.StatusCode, string(body))
 		code := errors.GeneralCode
 		switch resp.StatusCode {
 		case http.StatusUnauthorized:
@@ -682,7 +693,7 @@ func (c *client) do(req *http.Request) (*http.Response, error) {
 			code = errors.RateLimitCode
 		}
 		return nil, errors.New(nil).WithCode(code).
-			WithMessage(message)
+			WithMessagef("http status code: %d, body: %s", resp.StatusCode, string(body))
 	}
 	return resp, nil
 }
