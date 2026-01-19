@@ -119,6 +119,7 @@ const (
 	OIDCExtraRedirectParms           = "oidc_extra_redirect_parms"
 	OIDCScope                        = "oidc_scope"
 	OIDCUserClaim                    = "oidc_user_claim"
+	OIDCLogout                       = "oidc_logout"
 
 	CfgDriverDB                       = "db"
 	NewHarborAdminName                = "admin@harbor.local"
@@ -151,6 +152,7 @@ const (
 
 	OIDCCallbackPath = "/c/oidc/callback"
 	OIDCLoginPath    = "/c/oidc/login"
+	OIDCLoginoutPath = "/c/oidc/logout"
 
 	AuthProxyRedirectPath = "/c/authproxy/redirect"
 
@@ -250,4 +252,7 @@ const (
 
 	// Global Leeway used for token validation
 	JwtLeeway = 60 * time.Second
+
+	// The replication adapter whitelist
+	ReplicationAdapterWhiteList = "REPLICATION_ADAPTER_WHITELIST"
 )
