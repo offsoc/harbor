@@ -42,8 +42,8 @@ import (
 type gcTestSuite struct {
 	htesting.Suite
 	artifactCtl       *artifacttesting.Controller
-	artrashMgr        *trashtesting.FakeManager
-	registryCtlClient *registryctl.Mockclient
+	artrashMgr        *trashtesting.Manager
+	registryCtlClient *registryctl.Client
 	projectCtl        *projecttesting.Controller
 	blobMgr           *blob.Manager
 
@@ -54,8 +54,8 @@ type gcTestSuite struct {
 
 func (suite *gcTestSuite) SetupTest() {
 	suite.artifactCtl = &artifacttesting.Controller{}
-	suite.artrashMgr = &trashtesting.FakeManager{}
-	suite.registryCtlClient = &registryctl.Mockclient{}
+	suite.artrashMgr = &trashtesting.Manager{}
+	suite.registryCtlClient = &registryctl.Client{}
 	suite.blobMgr = &blob.Manager{}
 	suite.projectCtl = &projecttesting.Controller{}
 
@@ -98,7 +98,7 @@ func (suite *gcTestSuite) TestDeletedArt() {
 		},
 	}, nil)
 	suite.artifactCtl.On("Delete").Return(nil)
-	suite.artrashMgr.On("Filter").Return([]model.ArtifactTrash{
+	mock.OnAnything(suite.artrashMgr, "Filter").Return([]model.ArtifactTrash{
 		{
 			ID:                1,
 			Digest:            suite.DigestString(),
@@ -157,35 +157,44 @@ func (suite *gcTestSuite) TestInit() {
 	gc := &GarbageCollector{
 		registryCtlClient: suite.registryCtlClient,
 	}
-	params := map[string]interface{}{
+	params := map[string]any{
 		"delete_untagged": true,
+		"delete_tag":      true,
 		"redis_url_reg":   "redis url",
 		"time_window":     1,
 		"workers":         float64(3),
 	}
+
+	mock.OnAnything(gc.registryCtlClient, "Health").Return(nil)
 	suite.Nil(gc.init(ctx, params))
 	suite.True(gc.deleteUntagged)
+	suite.True(gc.deleteTag)
 	suite.Equal(3, gc.workers)
 
-	params = map[string]interface{}{
+	params = map[string]any{
 		"delete_untagged": "unsupported",
+		"delete_tag":      "unsupported",
 		"redis_url_reg":   "redis url",
 	}
 	suite.Nil(gc.init(ctx, params))
 	suite.True(gc.deleteUntagged)
+	suite.True(gc.deleteTag)
 
-	params = map[string]interface{}{
+	params = map[string]any{
 		"delete_untagged": false,
+		"delete_tag":      false,
 		"redis_url_reg":   "redis url",
 	}
 	suite.Nil(gc.init(ctx, params))
 	suite.False(gc.deleteUntagged)
+	suite.False(gc.deleteTag)
 
-	params = map[string]interface{}{
+	params = map[string]any{
 		"redis_url_reg": "redis url",
 	}
 	suite.Nil(gc.init(ctx, params))
 	suite.True(gc.deleteUntagged)
+	suite.True(gc.deleteTag)
 }
 
 func (suite *gcTestSuite) TestStop() {
@@ -208,6 +217,7 @@ func (suite *gcTestSuite) TestStop() {
 		registryCtlClient: suite.registryCtlClient,
 		artCtl:            suite.artifactCtl,
 		deleteUntagged:    true,
+		deleteTag:         true,
 	}
 
 	suite.Equal(errGcStop, gc.mark(ctx))
@@ -230,7 +240,7 @@ func (suite *gcTestSuite) TestRun() {
 		},
 	}, nil)
 	suite.artifactCtl.On("Delete").Return(nil)
-	suite.artrashMgr.On("Filter").Return([]model.ArtifactTrash{}, nil)
+	mock.OnAnything(suite.artrashMgr, "Filter").Return([]model.ArtifactTrash{}, nil)
 
 	mock.OnAnything(suite.projectCtl, "List").Return([]*proModels.Project{
 		{
@@ -271,19 +281,22 @@ func (suite *gcTestSuite) TestRun() {
 
 	mock.OnAnything(suite.blobMgr, "Delete").Return(nil)
 
+	mock.OnAnything(suite.registryCtlClient, "Health").Return(nil)
+
 	gc := &GarbageCollector{
 		artCtl:            suite.artifactCtl,
 		artrashMgr:        suite.artrashMgr,
 		blobMgr:           suite.blobMgr,
 		registryCtlClient: suite.registryCtlClient,
 	}
-	params := map[string]interface{}{
+	params := map[string]any{
 		"delete_untagged": false,
 		"redis_url_reg":   tests.GetRedisURL(),
 		"time_window":     1,
 		"workers":         3,
 	}
 
+	mock.OnAnything(gc.registryCtlClient, "DeleteBlob").Return(nil)
 	suite.Nil(gc.Run(ctx, params))
 }
 
@@ -302,7 +315,7 @@ func (suite *gcTestSuite) TestMark() {
 		},
 	}, nil)
 	suite.artifactCtl.On("Delete").Return(nil)
-	suite.artrashMgr.On("Filter").Return([]model.ArtifactTrash{
+	mock.OnAnything(suite.artrashMgr, "Filter").Return([]model.ArtifactTrash{
 		{
 			ID:                1,
 			Digest:            suite.DigestString(),
@@ -381,6 +394,7 @@ func (suite *gcTestSuite) TestSweep() {
 		workers: 3,
 	}
 
+	mock.OnAnything(gc.registryCtlClient, "DeleteBlob").Return(nil)
 	suite.Nil(gc.sweep(ctx))
 }
 
